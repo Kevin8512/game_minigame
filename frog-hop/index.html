@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#0f1226">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>青蛙跳 · 三对三</title>
+<style>
+/* ============================== 设计变量 ============================== */
+:root{
+  --bg1:#111533; --bg2:#1d1338; --bg3:#0a1024;
+  --panel:rgba(255,255,255,.06);
+  --panel-line:rgba(255,255,255,.12);
+  --text:#eef1ff;
+  --muted:#9aa3c7;
+  --a-main:#ff6b57; --a-dark:#c8341f; --a-glow:rgba(255,107,87,.55);
+  --b-main:#3fd0ff; --b-dark:#1a6ea8; --b-glow:rgba(63,208,255,.55);
+  --hole:#0b0f24;
+  --ok:#4ade80;
+  --rail:rgba(255,255,255,.10);
+  --rail-strong:rgba(255,255,255,.20);
+  --shadow:0 18px 40px rgba(0,0,0,.45);
+  --radius:18px;
+}
+html[data-theme="light"]{
+  --bg1:#eef2ff; --bg2:#fdeef3; --bg3:#e8ecff;
+  --panel:rgba(255,255,255,.75);
+  --panel-line:rgba(20,26,60,.10);
+  --text:#161a33;
+  --muted:#5b6486;
+  --a-main:#ff5a45; --a-dark:#c8341f; --a-glow:rgba(255,90,69,.40);
+  --b-main:#1aa8e6; --b-dark:#135f92; --b-glow:rgba(26,168,230,.40);
+  --hole:#dfe4f7;
+  --rail:rgba(20,26,60,.10);
+  --rail-strong:rgba(20,26,60,.22);
+  --shadow:0 18px 34px rgba(30,40,90,.18);
+}
+
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;width:100%;max-width:100%;overflow:hidden;overscroll-behavior:none}
+body{
+  margin:0;
+  font-family:system-ui,-apple-system,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+  color:var(--text);
+  background:
+    radial-gradient(1200px 600px at 15% -10%, var(--bg2), transparent 60%),
+    radial-gradient(900px 500px at 100% 110%, var(--bg1), transparent 55%),
+    linear-gradient(160deg,var(--bg3),var(--bg1) 60%,var(--bg2));
+  background-attachment:fixed;
+  overflow:hidden;
+  user-select:none;
+  -webkit-user-select:none;
+}
+
+.wrap{
+  height:100dvh; height:100vh;
+  display:grid;
+  grid-template-rows:auto 1fr auto;
+  gap:clamp(6px,1.4vh,14px);
+  padding:calc(env(safe-area-inset-top) + 10px) 12px calc(env(safe-area-inset-bottom) + 10px);
+  max-width:720px; margin:0 auto;
+}
+
+/* ============================== 顶栏 ============================== */
+header{display:flex;align-items:center;gap:10px}
+.brand{display:flex;align-items:center;gap:9px;min-width:0}
+.logo{
+  width:34px;height:34px;flex:none;border-radius:11px;
+  background:linear-gradient(135deg,var(--a-main),var(--b-main));
+  box-shadow:0 6px 18px rgba(0,0,0,.35);
+  display:grid;place-items:center;font-size:17px;
+}
+.brand h1{margin:0;font-size:clamp(15px,4.4vw,19px);letter-spacing:.4px;white-space:nowrap}
+.brand p{margin:2px 0 0;font-size:11px;color:var(--muted);white-space:nowrap}
+.spacer{flex:1 1 auto}
+.icon-btn{
+  width:38px;height:38px;flex:none;border-radius:12px;cursor:pointer;
+  border:1px solid var(--panel-line); background:var(--panel); color:var(--text);
+  font-size:16px; line-height:1; display:grid;place-items:center;
+  backdrop-filter:blur(8px); transition:transform .15s,background .2s,border-color .2s;
+}
+.icon-btn:hover{background:rgba(127,127,180,.18);border-color:var(--rail-strong)}
+.icon-btn:active{transform:scale(.92)}
+.icon-btn[aria-pressed="true"]{border-color:var(--ok);color:var(--ok)}
+
+/* ============================== 棋盘 ============================== */
+main{position:relative;display:grid;justify-items:center;align-items:stretch;min-height:0}
+.board-frame{
+  position:relative;
+  align-self:center;
+  display:grid; place-items:center;
+  padding:12px clamp(16px,5vw,30px);
+  border-radius:26px;
+  border:1px solid var(--panel-line);
+  background:var(--panel);
+  box-shadow:var(--shadow);
+  backdrop-filter:blur(10px);
+}
+.board{
+  position:relative;
+  display:grid; grid-template-rows:repeat(7,var(--cell,44px));
+  gap:var(--gap,10px); width:var(--cell,44px);
+}
+.board::before{
+  content:""; position:absolute; left:50%; transform:translateX(-50%);
+  top:calc(50% - 5px); width:2px; height:10px; border-radius:2px;
+  background:var(--rail-strong); opacity:.7;
+}
+.cell{
+  position:relative; z-index:1; border:0; padding:0; background:transparent; cursor:default;
+  display:grid; place-items:center;
+}
+.cell::after{ /* 凹槽 */
+  content:""; width:78%; aspect-ratio:1; border-radius:50%;
+  background:radial-gradient(circle at 50% 35%, rgba(0,0,0,.55), var(--hole));
+  box-shadow:inset 0 3px 8px rgba(0,0,0,.6), 0 1px 0 var(--rail);
+  transition:width .18s, box-shadow .25s, background .25s;
+}
+.cell.hint::after{
+  box-shadow:inset 0 3px 8px rgba(0,0,0,.5), 0 0 0 3px var(--ok), 0 0 20px var(--ok);
+}
+.cell.target::after{
+  animation:pop .9s ease-in-out infinite;
+  box-shadow:inset 0 3px 8px rgba(0,0,0,.5), 0 0 0 3px #ffd166, 0 0 22px rgba(255,209,102,.75);
+}
+@keyframes pop{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
+
+/* 归属区着色 */
+.cell.home-a::before,.cell.home-b::before{
+  content:""; position:absolute; inset:-2px; border-radius:14px; opacity:.10;
+}
+.cell.home-a::before{background:linear-gradient(180deg,var(--a-main),transparent)}
+.cell.home-b::before{background:linear-gradient(0deg,var(--b-main),transparent)}
+
+/* ============================== 棋子 ============================== */
+.pieces{position:absolute;inset:0;z-index:2;pointer-events:none}
+.piece{
+  position:absolute; width:var(--size,44px); height:var(--size,44px);
+  left:50%; transform:translate(-50%,-50%);
+  border-radius:50%; pointer-events:auto; cursor:pointer;
+  transition:top .22s cubic-bezier(.34,1.4,.5,1), transform .18s, filter .2s;
+  display:grid; place-items:center;
+  font-size:calc(var(--size,44px) * .52); font-weight:800; letter-spacing:0;
+  color:#fff; text-shadow:0 2px 3px rgba(0,0,0,.55);
+  will-change:top;
+}
+.piece::after{ /* 高光 */
+  content:""; position:absolute; inset:12% 16% 55% 16%; border-radius:50%;
+  background:linear-gradient(180deg,rgba(255,255,255,.55),transparent);
+  pointer-events:none;
+}
+.piece.a{
+  background:radial-gradient(circle at 34% 26%, #ffd0c4, var(--a-main) 48%, var(--a-dark));
+  box-shadow:0 8px 18px rgba(0,0,0,.4), inset 0 -4px 10px rgba(0,0,0,.28), 0 0 0 2px rgba(255,255,255,.20);
+}
+.piece.b{
+  background:radial-gradient(circle at 34% 26%, #d6f6ff, var(--b-main) 48%, var(--b-dark));
+  box-shadow:0 8px 18px rgba(0,0,0,.4), inset 0 -4px 10px rgba(0,0,0,.28), 0 0 0 2px rgba(255,255,255,.20);
+}
+.piece.selectable:hover{transform:translate(-50%,-50%) scale(1.06)}
+.piece.selected{
+  transform:translate(-50%,-50%) scale(1.1);
+  box-shadow:0 0 0 3px #fff, 0 0 22px var(--glow);
+  z-index:3;
+}
+.piece.a.selected{--glow:var(--a-glow)} .piece.b.selected{--glow:var(--b-glow)}
+.piece.moving{transition:top .22s cubic-bezier(.34,1.4,.5,1), transform .28s}
+.piece.jumping{z-index:4}
+.piece.jumping .piece-inner{animation:spin .34s ease-in-out}
+@keyframes spin{50%{transform:scale(1.22)}}
+.piece.dead{filter:grayscale(.45) brightness(.88);cursor:default}
+.board.dead .cell{opacity:.85}
+.piece.shake{animation:shake .3s}
+@keyframes shake{0%,100%{margin-left:0}25%{margin-left:-6px}75%{margin-left:6px}}
+.piece .badge{position:absolute;bottom:-3px;font-size:8px;opacity:.0}
+
+/* ============================== 底部控制 ============================== */
+footer{display:flex;flex-direction:column;gap:10px}
+.stats{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.chip{
+  display:flex;align-items:center;gap:6px;
+  padding:6px 11px;border-radius:999px;font-size:12px;
+  border:1px solid var(--panel-line);background:var(--panel);color:var(--muted);
+  backdrop-filter:blur(8px);
+}
+.chip b{color:var(--text);font-variant-numeric:tabular-nums;font-size:13px}
+.chip.hit{border-color:var(--ok);color:var(--ok)}
+.chip.hit b{color:var(--ok)}
+.actions{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.btn{
+  appearance:none;border:1px solid var(--panel-line);background:var(--panel);color:var(--text);
+  padding:11px 8px;border-radius:14px;font-size:13px;font-weight:600;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  transition:transform .12s,background .2s,border-color .2s,opacity .2s;
+  backdrop-filter:blur(8px);
+}
+.btn:hover:not(:disabled){background:rgba(127,127,180,.18);border-color:var(--rail-strong)}
+.btn:active:not(:disabled){transform:scale(.96)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn.primary{background:linear-gradient(135deg,var(--a-main),var(--b-main));border-color:transparent;color:#fff;font-weight:700}
+.btn.primary:hover{filter:brightness(1.07)}
+.btn.play{position:relative;overflow:hidden}
+
+/* ============================== 规则条 / 提示条 ============================== */
+.tip{
+  min-height:34px;display:flex;align-items:center;justify-content:center;gap:8px;
+  font-size:12.5px;color:var(--muted);text-align:center;
+  padding:6px 12px;border-radius:12px;border:1px solid transparent;
+  transition:background .25s,border-color .25s,color .25s;
+}
+.tip.warn{color:#ffd166;border-color:rgba(255,209,102,.4);background:rgba(255,209,102,.08)}
+.tip.good{color:var(--ok);border-color:rgba(74,222,128,.4);background:rgba(74,222,128,.08)}
+.tip.info{color:var(--text);border-color:var(--panel-line);background:var(--panel)}
+
+/* ============================== 胜利 / 规则弹层 ============================== */
+.overlay{
+  position:fixed;inset:0;z-index:20;display:grid;place-items:center;padding:20px;
+  background:rgba(6,8,20,.66);backdrop-filter:blur(6px);
+  opacity:0;pointer-events:none;transition:opacity .3s;
+}
+.overlay.show{opacity:1;pointer-events:auto}
+.card{
+  width:min(420px,100%);max-height:86vh;overflow:auto;
+  border-radius:24px;padding:22px;text-align:center;
+  border:1px solid var(--panel-line);
+  background:linear-gradient(160deg,rgba(30,34,70,.96),rgba(16,18,42,.98));
+  box-shadow:0 30px 70px rgba(0,0,0,.55);
+  transform:translateY(14px) scale(.96);transition:transform .3s cubic-bezier(.2,1.3,.4,1);
+}
+html[data-theme="light"] .card{background:linear-gradient(160deg,#fff,#eef1ff)}
+.overlay.show .card{transform:none}
+.card h2{margin:6px 0 4px;font-size:24px;letter-spacing:.5px}
+.card .emoji{font-size:44px;line-height:1}
+.card p{margin:8px 0 0;color:var(--muted);font-size:13.5px;line-height:1.7}
+.card .big{font-size:15px;color:var(--text)}
+.card .row{display:flex;gap:8px;margin-top:18px}
+.card .row .btn{flex:1}
+.rules{text-align:left;font-size:13.5px;line-height:1.75;color:var(--muted)}
+.rules b{color:var(--text)}
+.rules .kbd{
+  display:inline-block;padding:1px 7px;margin:0 2px;border-radius:6px;font-size:12px;
+  border:1px solid var(--panel-line);background:var(--panel);color:var(--text);
+}
+.rules ul{margin:10px 0 0;padding-left:18px}
+.rules li{margin:6px 0}
+.legend{display:flex;gap:16px;justify-content:center;margin:12px 0 2px;font-size:12.5px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center}
+.legend i{
+  display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;
+  margin-right:6px;font-style:normal;font-weight:800;font-size:13px;color:#fff;
+  text-shadow:0 1px 1px rgba(0,0,0,.45);
+}
+.legend .da{background:radial-gradient(circle at 35% 28%,#ff9e8d,var(--a-main) 55%,var(--a-dark))}
+.legend .db{background:radial-gradient(circle at 35% 28%,#a9ecff,var(--b-main) 55%,var(--b-dark))}
+
+/* 彩带 */
+.confetti{position:fixed;inset:0;pointer-events:none;z-index:30;overflow:hidden}
+.confetti i{position:absolute;top:-14px;width:8px;height:14px;border-radius:2px;animation:fall linear forwards}
+@keyframes fall{to{transform:translateY(104vh) rotate(720deg);opacity:.9}}
+
+@media (max-height:620px){
+  .brand p{display:none}
+}
+@media (min-width:560px) and (min-height:520px){
+  .actions{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <div class="logo" aria-hidden="true">🐸</div>
+      <div>
+        <h1 data-i18n="title">青蛙跳 · 三对三</h1>
+        <p data-i18n="subtitle">三上三下，换个位置</p>
+      </div>
+    </div>
+    <div class="spacer"></div>
+    <button class="icon-btn" id="btnHelp" aria-label="规则" title="规则">?</button>
+    <button class="icon-btn" id="btnSound" aria-pressed="true" aria-label="音效" title="音效">🔊</button>
+    <button class="icon-btn" id="btnTheme" aria-label="主题" title="主题">🌙</button>
+  </header>
+
+  <main>
+    <div class="board-frame">
+      <div class="board" id="board">
+        <div class="pieces" id="pieces"></div>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <div class="tip" id="tip" data-i18n="tipStart">点一枚棋子，再点亮的空位；或直接点亮的空位。</div>
+    <div class="stats">
+      <span class="chip"><span data-i18n="moves">步数</span> <b id="statMoves">0</b></span>
+      <span class="chip" id="chipBest"><span data-i18n="best">最少</span> <b id="statBest">15</b></span>
+      <span class="chip" id="chipWins"><span data-i18n="wins">通关</span> <b id="statWins">0</b></span>
+    </div>
+    <div class="actions">
+      <button class="btn" id="btnUndo"><span>↩︎</span><span data-i18n="undo">撤销</span></button>
+      <button class="btn" id="btnHint"><span>💡</span><span data-i18n="hint">提示</span></button>
+      <button class="btn" id="btnRestart"><span>⟳</span><span data-i18n="restart">重开</span></button>
+    </div>
+  </footer>
+</div>
+
+<!-- 胜利 -->
+<div class="overlay" id="winOverlay">
+  <div class="card">
+    <div class="emoji">🎉</div>
+    <h2 data-i18n="winTitle">通关！</h2>
+    <p id="winText">三枚红子↓全部到了下边，三枚蓝子↑全部到了上边。</p>
+    <div class="row">
+      <button class="btn" id="btnWinAgain" data-i18n="again">再来一局</button>
+      <button class="btn primary" id="btnWinClose" data-i18n="ok">好的</button>
+    </div>
+  </div>
+</div>
+
+<!-- 规则 -->
+<div class="overlay" id="helpOverlay">
+  <div class="card">
+    <div class="emoji">📜</div>
+    <h2 data-i18n="helpTitle">玩法</h2>
+    <div class="legend">
+      <span><i class="da">↓</i>红色只能向下</span>
+      <span><i class="db">↑</i>蓝色只能向上</span>
+    </div>
+    <div class="rules">
+      <ul>
+        <li><b>走一格</b>：向前走一步，落在紧邻的空位。</li>
+        <li><b>跳一步</b>：向前跳过相邻的一枚对手棋子，落在它后面的空位。</li>
+        <li><b>不许后退</b>：红色只往下、蓝色只往上，也不能跳过自己人。</li>
+        <li><b>胜利</b>：三枚红子全到下边，三枚蓝子全到上边。</li>
+      </ul>
+      <p style="margin-top:12px">
+        桌面端：<span class="kbd">U</span> 撤销，<span class="kbd">H</span> 提示，<span class="kbd">R</span> 重开。
+      </p>
+      <p>理论上最少 <b>15 步</b>可以完成；棋盘很小，但一步走错就会卡住，需要撤销。</p>
+    </div>
+    <div class="row"><button class="btn primary" id="btnHelpClose" data-i18n="ok">好的</button></div>
+  </div>
+</div>
+
+<div class="confetti" id="confetti"></div>
+
+<script>
+/* ==========================================================================
+   青蛙跳 · 三对三
+   5 个竖排位置 → 这里用 7 格布局（3 + 空 + 3）表达，等价且更直观：
+   位置 0..6，初始 a a a _ b b b，目标 b b b _ a a a
+   说明：内部用 a / b 表示两队，界面上不出现这两个代号 ——
+         a = 红色向下棋子（显示 ↓），b = 蓝色向上棋子（显示 ↑）。
+   ========================================================================== */
+(function () {
+  'use strict';
+
+  var N = 7;                                  // 位置数
+  var HOME = ['a','a','a','.','b','b','b'];   // 初始
+  var GOAL = ['b','b','b','.','a','a','a'];   // 目标
+
+  /* ------------------------------ 游戏状态 ------------------------------ */
+  var state = {
+    board: HOME.slice(),   // 每格：'a' | 'b' | '.'
+    history: [],           // 撤销栈
+    moves: 0,
+    won: false,
+    selected: null,        // 当前选中的格子下标
+    hintMove: null,        // 提示中的一步 [from, to]
+    auto: null,            // 自动演示定时器
+    dead: false
+  };
+
+  var $ = function (id) { return document.getElementById(id); };
+  var boardEl = $('board'), piecesEl = $('pieces'), tipEl = $('tip');
+
+  /* ------------------------------ 规则内核 ------------------------------ */
+  // a 向下（下标 +1），b 向上（下标 -1）
+  function dirOf(p) { return p === 'a' ? 1 : -1; }
+
+  // 返回该棋子的所有合法走法 [{from,to,kind}]
+  function movesOf(board, i) {
+    var p = board[i], out = [];
+    if (p !== 'a' && p !== 'b') return out;
+    var d = dirOf(p);
+    var j = i + d;
+    if (j >= 0 && j < N && board[j] === '.') out.push({ from: i, to: j, kind: 'step' });
+    var k = i + 2 * d;
+    if (k >= 0 && k < N && board[j] && board[j] !== '.' && board[j] !== p && board[k] === '.') {
+      out.push({ from: i, to: k, kind: 'jump' });
+    }
+    return out;
+  }
+
+  function legalMoves(board) {
+    var all = [];
+    for (var i = 0; i < N; i++) all = all.concat(movesOf(board, i));
+    return all;
+  }
+
+  function isGoal(board) {
+    for (var i = 0; i < N; i++) if (board[i] !== GOAL[i]) return false;
+    return true;
+  }
+
+  /* --------------------------- 求最优解（提示/演示） --------------------------- */
+  // BFS：状态空间只有 7!/(3!3!) = 140 种，瞬间完成
+  function solve(board) {
+    if (isGoal(board)) return [];
+    var startKey = board.join('');
+    var queue = [{ b: board.slice(), path: [] }];
+    var seen = Object.create(null); seen[startKey] = 1;
+    while (queue.length) {
+      var cur = queue.shift();
+      var ms = legalMoves(cur.b);
+      for (var m = 0; m < ms.length; m++) {
+        var mv = ms[m], nb = cur.b.slice();
+        nb[mv.to] = nb[mv.from]; nb[mv.from] = '.';
+        var key = nb.join('');
+        if (seen[key]) continue;
+        seen[key] = 1;
+        var path = cur.path.concat([mv]);
+        if (isGoal(nb)) return path;
+        queue.push({ b: nb, path: path });
+      }
+    }
+    return null; // 无解（当前局面已卡死）
+  }
+
+  /* ------------------------------ 渲染 ------------------------------ */
+  var cells = [];
+  function buildBoard() {
+    for (var i = 0; i < N; i++) {
+      var c = document.createElement('button');
+      c.className = 'cell';
+      c.type = 'button';
+      c.dataset.index = String(i);
+      if (i < 3) c.classList.add('home-a');
+      if (i > 3) c.classList.add('home-b');
+      boardEl.appendChild(c);
+      cells.push(c);
+    }
+    // 棋盘尺寸：按可视高度自适应，保证手机一屏放下
+    fitBoard();
+    window.addEventListener('resize', fitBoard);
+    window.addEventListener('orientationchange', fitBoard);
+  }
+
+  function fitBoard() {
+    // 尺寸只由视口推导，不回头读取自身布局（避免循环依赖导致棋子错位）
+    var narrow = Math.min(window.innerWidth || 390, 560);
+    var gap = Math.max(7, Math.min(14, Math.round(narrow * 0.026)));
+    var availW = narrow - 2 * 14 - 2 * 30;                           // 页面内边距 + 面板左右内边距
+    var availH = (window.innerHeight || 780) - 2 * 12 - 224;         // 页面内边距、顶栏与底部控件
+    var size = Math.floor(Math.min((availW - gap * (N - 1)) / N,
+                                   (availH - gap * (N - 1)) / N));
+    size = Math.max(26, Math.min(size, 76));
+    var root = document.documentElement.style;
+    root.setProperty('--cell', size + 'px');
+    root.setProperty('--gap', gap + 'px');
+    root.setProperty('--size', Math.round(size * 0.92) + 'px');
+    positionPieces(true);
+  }
+
+  // 棋子 DOM：一次创建，之后只更新位置（transition 负责动画）
+  var pieceEls = {};
+  function buildPieces() {
+    for (var i = 0; i < N; i++) {
+      var p = document.createElement('div');
+      p.className = 'piece';
+      p.dataset.index = String(i);
+      var inner = document.createElement('span');
+      inner.className = 'piece-inner';
+      p.appendChild(inner);
+      piecesEl.appendChild(p);
+      pieceEls[i] = p;
+    }
+  }
+
+  function cssVar(name, fallback) {
+    var v = document.documentElement.style && document.documentElement.style.getPropertyValue(name);
+    if (!v || !String(v).trim()) {
+      try { v = getComputedStyle(document.documentElement).getPropertyValue(name); } catch (e) { v = ''; }
+    }
+    var n = parseFloat(v);
+    return isNaN(n) ? fallback : n;
+  }
+
+  function centerOf(i) {
+    // 优先读第一格相对棋盘的偏移，逐格累加；读不到就按 CSS 变量推算
+    var cell = cssVar('--cell', 44), gap = cssVar('--gap', 10);
+    var base = 0;
+    if (cells[0] && boardEl.getBoundingClientRect) {
+      var r0 = cells[0].getBoundingClientRect(), rb = boardEl.getBoundingClientRect();
+      if (r0.height > 0) base = (r0.top - rb.top);
+    }
+    return base + i * (cell + gap) + cell / 2;
+  }
+
+  function positionPieces(instant) {
+    for (var i = 0; i < N; i++) {
+      var el = pieceEls[i];
+      if (!el) continue;                   // 首次布局时棋子还没创建
+      var top = centerOf(i);
+      if (instant) el.style.transition = 'none';
+      el.style.top = top + 'px';
+      if (instant) {
+        /* 强制回流，恢复过渡 */
+        void el.offsetHeight;
+        el.style.transition = '';
+      }
+    }
+  }
+
+  function render() {
+    // 棋子内容与外观
+    for (var i = 0; i < N; i++) {
+      var el = pieceEls[i], v = state.board[i];
+      var onBoard = v === 'a' || v === 'b';
+      el.style.display = onBoard ? 'grid' : 'none';
+      if (onBoard) {
+        el.className = 'piece ' + v + (el.classList.contains('jumping') ? ' jumping' : '');
+        el.firstChild.textContent = v === 'a' ? '↓' : '↑';   // 红子向下、蓝子向上
+        var canMove = movesOf(state.board, i).length > 0;
+        el.classList.toggle('selectable', canMove && !state.won);
+        el.classList.toggle('dead', !canMove && !state.won);
+        el.classList.toggle('selected', state.selected === i);
+        el.setAttribute('aria-label', (v === 'a' ? '向下' : '向上') + '棋子');
+      }
+    }
+    positionPieces(false);
+
+    // 空位与高亮
+    var targets = [];
+    if (state.selected !== null) {
+      targets = movesOf(state.board, state.selected).map(function (m) { return m.to; });
+    }
+    for (var c = 0; c < N; c++) {
+      var cell = cells[c];
+      cell.classList.toggle('target', targets.indexOf(c) >= 0);
+      cell.classList.toggle('hint', !!state.hintMove && (state.hintMove[0] === c || state.hintMove[1] === c));
+      cell.style.cursor = targets.indexOf(c) >= 0 ? 'pointer' : 'default';
+      cell.disabled = state.board[c] !== '.';
+    }
+
+    // 统计
+    $('statMoves').textContent = String(state.moves);
+    var best = load('fj_best', 0);
+    $('statBest').textContent = best ? String(best) : '15';
+    $('statWins').textContent = String(load('fj_wins', 0));
+    $('btnUndo').disabled = state.history.length === 0;
+    $('chipBest').classList.toggle('hit', !!best && best <= 15);
+  }
+
+  /* ------------------------------ 交互 ------------------------------ */
+  function setTip(key, cls) {
+    tipEl.setAttribute('data-i18n', key);
+    tipEl.textContent = t(key);
+    tipEl.className = 'tip' + (cls ? ' ' + cls : '');
+  }
+
+  function select(i) {
+    if (state.won || state.auto) return;
+    state.hintMove = null;
+    if (state.board[i] === '.') {
+      // 点空位：若恰好只有一个棋子能走到这里，就替玩家走
+      var cands = [];
+      for (var k = 0; k < N; k++) {
+        movesOf(state.board, k).forEach(function (m) { if (m.to === i) cands.push(m); });
+      }
+      if (cands.length === 1) { doMove(cands[0]); return; }
+      if (cands.length === 0) { setTip('tipNotEmpty', 'warn'); shake(i); return; }
+      state.selected = null;
+      setTip('tipPickPiece', 'info');
+      render();
+      return;
+    }
+    var ms = movesOf(state.board, i);
+    if (!ms.length) {
+      setTip('tipStuck', 'warn');
+      shake(i);
+      return;
+    }
+    if (state.selected === i) { state.selected = null; setTip('tipPickPiece'); render(); return; }
+    state.selected = i;
+    setTip('tipPickHole', 'info');
+    render();
+  }
+
+  function shake(i) {
+    var el = pieceEls[i];
+    el.classList.remove('shake');
+    void el.offsetWidth;
+    el.classList.add('shake');
+    setTimeout(function () { el.classList.remove('shake'); }, 320);
+    beep('bad');
+  }
+
+  function doMove(mv) {
+    if (state.won) return;
+    state.history.push({ board: state.board.slice(), moves: state.moves });
+    var piece = state.board[mv.from];
+    state.board[mv.to] = piece;
+    state.board[mv.from] = '.';
+    state.moves++;
+    state.selected = null;
+    state.hintMove = null;
+
+    if (mv.kind === 'jump') {
+      pieceEls[mv.from].classList.add('jumping');
+      setTimeout(function () { pieceEls[mv.from].classList.remove('jumping'); }, 340);
+    }
+    beep(mv.kind === 'jump' ? 'jump' : 'step');
+
+    render();
+
+    if (isGoal(state.board)) { onWin(); return; }
+
+    // 卡死：双方都没有合法走法
+    if (legalMoves(state.board).length === 0) {
+      state.dead = true;
+      boardEl.classList.add('dead');
+      setTip('tipDead', 'warn');
+    } else {
+      boardEl.classList.remove('dead');
+      setTip(mv.kind === 'jump' ? 'tipJumped' : 'tipMoved');
+    }
+  }
+
+  function undo() {
+    if (!state.history.length || state.auto) return;
+    var prev = state.history.pop();
+    state.board = prev.board;
+    state.moves = prev.moves;
+    state.won = false;
+    state.dead = false;
+    state.selected = null;
+    state.hintMove = null;
+    boardEl.classList.remove('dead');
+    $('winOverlay').classList.remove('show');
+    beep('undo');
+    setTip('tipUndo');
+    render();
+  }
+
+  function restart() {
+    if (state.auto) stopAuto();
+    state.board = HOME.slice();
+    state.history = [];
+    state.moves = 0;
+    state.won = false;
+    state.dead = false;
+    state.selected = null;
+    state.hintMove = null;
+    boardEl.classList.remove('dead');
+    $('winOverlay').classList.remove('show');
+    setTip('tipStart');
+    render();
+  }
+
+  function hint() {
+    if (state.won || state.auto) return;
+    var path = solve(state.board);
+    if (!path || !path.length) { setTip('tipDead', 'warn'); return; }
+    var mv = path[0];
+    state.selected = mv.from;
+    state.hintMove = [mv.from, mv.to];
+    setTip(path.length === 1 ? 'tipLastStep' : 'tipHint', 'good');
+    render();
+  }
+
+  /* ------------------------------ 自动演示 ------------------------------ */
+  function toggleAuto() {
+    if (state.auto) { stopAuto(); return; }
+    var path = solve(state.board);
+    if (!path || !path.length) { setTip('tipDead', 'warn'); return; }
+    var seq = path.slice();
+    setTip('tipAuto', 'good');
+    var run = function () {
+      if (!seq.length || !state.auto) { stopAuto(); return; }
+      doMove(seq.shift());
+      state.auto = setTimeout(run, 620);
+    };
+    state.auto = setTimeout(run, 120);
+    $('btnHint').setAttribute('aria-pressed', 'true');
+  }
+  function stopAuto() {
+    if (state.auto) clearTimeout(state.auto);
+    state.auto = null;
+    $('btnHint').setAttribute('aria-pressed', 'false');
+    if (!state.won) setTip('tipPickPiece');
+  }
+
+  /* ------------------------------ 胜利 ------------------------------ */
+  function onWin() {
+    state.won = true;
+    stopAuto();
+    var wins = load('fj_wins', 0) + 1;
+    save('fj_wins', wins);
+    var best = load('fj_best', 0);
+    if (!best || state.moves < best) { best = state.moves; save('fj_best', best); }
+
+    var perfect = state.moves <= 15;
+    $('winText').textContent = (perfect ? t('winPerfect') : t('winNormal')).replace('{n}', state.moves)
+      + ' ' + t('winText');
+    $('winOverlay').classList.add('show');
+    confetti();
+    beep('win');
+    render();
+  }
+
+  function confetti() {
+    var host = $('confetti');
+    var colors = ['#ff6b57', '#ffd166', '#4ade80', '#3fd0ff', '#c084fc', '#fff'];
+    for (var i = 0; i < 70; i++) {
+      var s = document.createElement('i');
+      s.style.left = Math.random() * 100 + 'vw';
+      s.style.background = colors[(Math.random() * colors.length) | 0];
+      s.style.animationDuration = (1.6 + Math.random() * 1.6) + 's';
+      s.style.animationDelay = (Math.random() * 0.4) + 's';
+      s.style.transform = 'rotate(' + (Math.random() * 360) + 'deg)';
+      host.appendChild(s);
+    }
+    setTimeout(function () { host.innerHTML = ''; }, 3600);
+  }
+
+  /* ------------------------------ 音效（WebAudio 合成，无外部资源） ------------------------------ */
+  var audio = null, soundOn = load('fj_sound', 1) === 1;
+  function ac() {
+    if (!audio) {
+      var C = window.AudioContext || window.webkitAudioContext;
+      if (!C) return null;
+      audio = new C();
+    }
+    if (audio.state === 'suspended') audio.resume();
+    return audio;
+  }
+  function tone(freq, dur, type, gain, delay) {
+    var a = ac(); if (!a) return;
+    var t0 = a.currentTime + (delay || 0);
+    var osc = a.createOscillator(), g = a.createGain();
+    osc.type = type || 'sine';
+    osc.frequency.setValueAtTime(freq, t0);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(gain || 0.16, t0 + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    osc.connect(g).connect(a.destination);
+    osc.start(t0); osc.stop(t0 + dur + 0.02);
+  }
+  function beep(kind) {
+    if (!soundOn) return;
+    if (kind === 'step') tone(520, 0.11, 'triangle', 0.13);
+    else if (kind === 'jump') { tone(430, 0.09, 'square', 0.08); tone(700, 0.14, 'triangle', 0.13, 0.05); }
+    else if (kind === 'undo') tone(330, 0.12, 'sine', 0.11);
+    else if (kind === 'bad') tone(150, 0.16, 'sawtooth', 0.07);
+    else if (kind === 'win') {
+      [523, 659, 784, 1047].forEach(function (f, i) { tone(f, 0.28, 'triangle', 0.15, i * 0.11); });
+    }
+  }
+
+  /* ------------------------------ 多语言 ------------------------------ */
+  var I18N = {
+    zh: {
+      title: '青蛙跳 · 三对三', subtitle: '三上三下，换个位置',
+      moves: '步数', best: '最少', wins: '通关',
+      undo: '撤销', hint: '提示', restart: '重开',
+      again: '再来一局', ok: '好的',
+      tipStart: '点一枚棋子，再点亮的空位；也可以直接点你想走的那个空位。',
+      tipPickPiece: '选一枚棋子。',
+      tipPickHole: '再点一下亮起的空位就能走。',
+      tipMoved: '走得漂亮，继续。', tipJumped: '跳成功！',
+      tipUndo: '已撤销一步。', tipHint: '按这个亮起来的位置走。', tipLastStep: '最后一步，走它！',
+      tipStuck: '这枚棋子走不动了，换一枚。',
+      tipNotEmpty: '这个空位现在谁也走不过去。',
+      tipDead: '卡住了：谁都没有合法走法，撤销一步或重开吧。',
+      tipAuto: '自动演示中…再点一次「提示」可以停下。',
+      winTitle: '通关！', winText: '三枚红子↓全部到了下边，三枚蓝子↑全部到了上边。',
+      winPerfect: '第 {n} 步完成 —— 这就是最优解！', winNormal: '第 {n} 步完成，最少只要 15 步。',
+      helpTitle: '玩法'
+    },
+    en: {
+      title: 'Frog Hop · 3v3', subtitle: 'Swap the two teams',
+      moves: 'Moves', best: 'Best', wins: 'Wins',
+      undo: 'Undo', hint: 'Hint', restart: 'Restart',
+      again: 'Play again', ok: 'OK',
+      tipStart: 'Tap a piece, then tap a glowing hole — or just tap the hole you want.',
+      tipPickPiece: 'Pick a piece.',
+      tipPickHole: 'Now tap a glowing hole to move.',
+      tipMoved: 'Nice, keep going.', tipJumped: 'Jump!',
+      tipUndo: 'Move undone.', tipHint: 'Play the highlighted move.', tipLastStep: 'One step left — go!',
+      tipStuck: 'That piece cannot move. Try another.',
+      tipNotEmpty: 'Nothing can reach that hole right now.',
+      tipDead: 'Stuck: no legal moves. Undo or restart.',
+      tipAuto: 'Auto-solving… tap Hint again to stop.',
+      winTitle: 'Solved!', winText: 'All three red ↓ pieces are at the bottom and all three blue ↑ pieces are at the top.',
+      winPerfect: 'Done in {n} moves — that is optimal!', winNormal: 'Done in {n} moves. Optimal is 15.',
+      helpTitle: 'How to play'
+    }
+  };
+  var lang = load('fj_lang', 0) || ((navigator.language || 'zh').toLowerCase().indexOf('zh') === 0 ? 'zh' : 'en');
+  function t(k) { return (I18N[lang] && I18N[lang][k]) || (I18N.zh[k] || k); }
+  function applyLang() {
+    document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en';
+    var list = document.querySelectorAll('[data-i18n]');
+    for (var i = 0; i < list.length; i++) {
+      var k = list[i].getAttribute('data-i18n');
+      if (I18N[lang] && I18N[lang][k]) list[i].textContent = I18N[lang][k];
+    }
+  }
+
+  /* ------------------------------ 存储 ------------------------------ */
+  function save(k, v) { try { localStorage.setItem(k, String(v)); } catch (e) {} }
+  function load(k, d) {
+    try { var v = localStorage.getItem(k); return v === null ? d : (isNaN(+v) ? v : +v); } catch (e) { return d; }
+  }
+
+  /* ------------------------------ 事件绑定 ------------------------------ */
+  function bind() {
+    boardEl.addEventListener('click', function (e) {
+      var hit = e.target && e.target.closest ? e.target.closest('.piece,.cell') : null;
+      if (!hit) return;
+      var i = +hit.dataset.index;
+      if (state.selected !== null && state.board[i] === '.') {
+        var ms = movesOf(state.board, state.selected);
+        for (var m = 0; m < ms.length; m++) if (ms[m].to === i) { doMove(ms[m]); return; }
+      }
+      select(i);
+    });
+
+    $('btnUndo').addEventListener('click', undo);
+    $('btnRestart').addEventListener('click', restart);
+    $('btnHint').addEventListener('click', function () {
+      if (state.auto) { stopAuto(); return; }
+      hint();
+    });
+    // 长按提示键 = 自动演示
+    var holdTimer = null;
+    $('btnHint').addEventListener('pointerdown', function () {
+      holdTimer = setTimeout(function () { holdTimer = null; toggleAuto(); }, 600);
+    });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (ev) {
+      $('btnHint').addEventListener(ev, function () { if (holdTimer) { clearTimeout(holdTimer); holdTimer = null; } });
+    });
+
+    $('btnHelp').addEventListener('click', function () { $('helpOverlay').classList.add('show'); });
+    $('btnHelpClose').addEventListener('click', function () { $('helpOverlay').classList.remove('show'); });
+    $('btnWinClose').addEventListener('click', function () { $('winOverlay').classList.remove('show'); });
+    $('btnWinAgain').addEventListener('click', restart);
+    $('helpOverlay').addEventListener('click', function (e) { if (e.target === this) this.classList.remove('show'); });
+    $('winOverlay').addEventListener('click', function (e) { if (e.target === this) this.classList.remove('show'); });
+
+    $('btnSound').addEventListener('click', function () {
+      soundOn = !soundOn; save('fj_sound', soundOn ? 1 : 0);
+      this.textContent = soundOn ? '🔊' : '🔇';
+      this.setAttribute('aria-pressed', String(soundOn));
+      if (soundOn) beep('step');
+    });
+    $('btnTheme').addEventListener('click', function () {
+      var next = document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', next);
+      save('fj_theme', next);
+      this.textContent = next === 'light' ? '☀️' : '🌙';
+    });
+
+    document.addEventListener('keydown', function (e) {
+      var k = e.key.toLowerCase();
+      if (k === 'u' || k === 'z') { undo(); return; }
+      if (k === 'h') { hint(); return; }
+      if (k === 'r') { restart(); return; }
+      if (k === 'escape') {
+        $('helpOverlay').classList.remove('show');
+        $('winOverlay').classList.remove('show');
+        state.selected = null; render();
+      }
+      if (k === 'l') { lang = lang === 'zh' ? 'en' : 'zh'; save('fj_lang', lang); applyLang(); render(); setTip('tipPickPiece'); }
+    });
+    window.addEventListener('resize', function () { positionPieces(true); });
+  }
+
+  /* ------------------------------ 启动 ------------------------------ */
+  function init() {
+    var theme = load('fj_theme', '');
+    if (theme) document.documentElement.setAttribute('data-theme', theme);
+    $('btnTheme').textContent = document.documentElement.getAttribute('data-theme') === 'light' ? '☀️' : '🌙';
+    $('btnSound').textContent = soundOn ? '🔊' : '🔇';
+    $('btnSound').setAttribute('aria-pressed', String(soundOn));
+
+    buildBoard();
+    buildPieces();
+    bind();
+    applyLang();
+    render();
+    // 首屏尺寸稳定后再校准一次
+    requestAnimationFrame(function () { fitBoard(); positionPieces(true); setTimeout(function () { fitBoard(); positionPieces(true); }, 60); });
+
+    // 首次进入自动展示规则；加 ?noh 可跳过（截图/演示用）
+    var skipHelp = /[?&]noh\b/.test(location.search || '');
+    if (!skipHelp && !load('fj_seen', 0)) { save('fj_seen', 1); $('helpOverlay').classList.add('show'); }
+  }
+
+  // 便于调试与测试
+  window.__fj = { state: state, solve: solve, legalMoves: legalMoves, movesOf: movesOf, isGoal: isGoal, HOME: HOME, GOAL: GOAL };
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
+</script>
+</body>
+</html>
